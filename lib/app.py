@@ -1,0 +1,218 @@
+from dataclasses import dataclass, field
+from typing import Optional, List
+
+import subprocess
+
+import pyvda
+import win32gui
+
+from lib.position import Position
+
+
+@dataclass
+class AppConfig:
+    """
+    Global configuration for an app.
+
+    Attributes:
+        path (str): The path to the application executable.
+        default_position (Optional[Position]): The default position of the application window.
+        default_args (List[str]): The default arguments to pass to the application.
+        kill_before_start_command (Optional[str]): Command to kill the application before starting it.
+        state (Optional[bool]): The state of the application.
+    """
+    path: str
+    default_position: Optional[Position] = field(default_factory=lambda: Position())
+    default_args: List[str] = field(default_factory=list)
+    kill_before_start_command: Optional[str] = ''
+    state: Optional[bool] = False
+
+
+@dataclass
+class LocalAppConfig:
+    """
+    Local configuration overrides for an app.
+
+    Attributes:
+        app (str): The name of the application.
+        args (List[str]): The arguments to pass to the application.
+        zone (Optional[str]): The zone configuration for the application.
+        minimize (Optional[bool]): Whether to minimize the application on start.
+        position (Optional[Position]): The position of the application window.
+    """
+    app: str
+    args: List[str] = field(default_factory=list)
+    zone: Optional[str] = field(default_factory=lambda: "0:0")
+    minimize: Optional[bool] = False
+    position: Optional[Position] = None
+
+    def __post_init__(self):
+        """
+        Post-initialization processing to parse the zone configuration.
+        """
+        monitor, zone = self.zone.split(":")
+        monitor = int(monitor)
+        self.zone = (monitor, zone)
+
+
+class App:
+    """
+    Combines global (AppConfig) and local (LocalAppConfig) configurations.
+
+    Methods:
+        open(): Launch the app and store its window handle.
+        move_window(force: bool = False): Move the application window to the specified position.
+        get_window_position() -> Position: Get the current position of the application window.
+        resolve_path(): Resolve the path to the application executable.
+        resolve_args(): Resolve the arguments to pass to the application.
+        resolve_position(): Resolve the position of the application window.
+        resolve_minimize(): Resolve whether to minimize the application on start.
+        resolve_kill_command(): Resolve the command to kill the application before starting it.
+    """
+
+    def __init__(self, app_config: AppConfig, local_config: LocalAppConfig, zone_config_file: Optional[str] = None):
+        """
+        Initialize the App with global and local configurations.
+
+        Args:
+            app_config (AppConfig): The global configuration for the app.
+            local_config (LocalAppConfig): The local configuration overrides for the app.
+            zone_config_file (Optional[str]): The zone configuration file.
+        """
+        self.app_config = app_config
+        self.local_config = local_config
+        self.zone_config_file = zone_config_file
+        self.window_handle = None
+        self.process = None
+
+    def open(self):
+        """
+        Launch the app and store its window handle.
+        """
+        print(f"Launching App: {self.resolve_path()}")
+        self.process = subprocess.Popen([self.resolve_path()] + self.resolve_args(), shell=True,
+                                        creationflags=subprocess.DETACHED_PROCESS)
+
+        self.window_handle = _get_window_handle()
+        self.move_window()
+
+    def move_window(self, force: bool = False):
+        """
+        Move the application window to the specified position.
+
+        Args:
+            force (bool): Whether to force the window move.
+        """
+        position = self.resolve_position()
+        window_handle = self.window_handle
+
+        offset = Position(
+            x=-7,
+            y=-3,
+            width=14,
+            height=7
+        )
+        print(position + offset)
+        x, y, width, height = position + offset
+
+        win32gui.MoveWindow(window_handle, x, y, width, height, True)
+
+    def get_window_position(self) -> Position:
+        """
+        Get the current position of the application window.
+
+        Returns:
+            Position: The current position of the application window.
+        """
+        if not self.window_handle:
+            return Position(0, 0, 0, 0)
+        rect = win32gui.GetWindowRect(self.window_handle)
+        x = rect[0]
+        y = rect[1]
+        width = rect[2] - rect[0]
+        height = rect[3] - rect[1]
+        return Position(x, y, width, height)
+
+    def resolve_path(self):
+        """
+        Resolve the path to the application executable.
+
+        Returns:
+            str: The path to the application executable.
+        """
+        return self.app_config.path
+
+    def resolve_args(self):
+        """
+        Resolve the arguments to pass to the application.
+
+        Returns:
+            List[str]: The arguments to pass to the application.
+        """
+        if not self.local_config.args and not self.app_config.default_args:
+            return []
+        elif not self.local_config.args:
+            return self.app_config.default_args
+        elif not self.app_config.default_args:
+            return self.local_config.args
+        else:
+            return self.app_config.default_args + self.local_config.args
+
+    def resolve_position(self):
+        """
+        Resolve the position of the application window.
+
+        Returns:
+            Position: The position of the application window.
+        """
+        return self.local_config.position or self.app_config.default_position
+
+    def resolve_minimize(self):
+        """
+        Resolve whether to minimize the application on start.
+
+        Returns:
+            bool: Whether to minimize the application on start.
+        """
+        return self.local_config.minimize if self.local_config.minimize is not None else False
+
+    def resolve_kill_command(self):
+        """
+        Resolve the command to kill the application before starting it.
+
+        Returns:
+            str: The command to kill the application before starting it.
+        """
+        return self.local_config.kill_before_start_command or self.app_config.kill_before_start_command
+
+
+def _get_window_handle(previous_window_handles=[], retries=150):
+    """
+    Get the window handle of the application.
+
+
+    Args:
+        previous_window_handles (List[int]): The list of previous window handles.
+        retries (int): The number of retries to get the window handle.
+
+    Returns:
+        int: The window handle of the application.
+
+    Raises:
+        RuntimeError: If the window handle could not be found after the specified retries.
+    """
+    if retries == 0:  # prevent forever loop
+        print("try increasing retries")
+        raise RuntimeError
+
+    current_window_handles = [app.hwnd for app in pyvda.VirtualDesktop.current().apps_by_z_order()]
+
+    # Find a window_handle that is not in the previous_window_handles
+    for window_handle in current_window_handles:
+        if window_handle not in previous_window_handles:
+            previous_window_handles.append(window_handle)
+            return window_handle
+
+    #Recursion is necessary to prevent the wrong window handel being assigned
+    # Retry with reduced attempts
+    return _get_window_handle(previous_window_handles, retries - 1)

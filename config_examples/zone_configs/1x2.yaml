@@ -1,0 +1,13 @@
+- monitor: 1
+  zones:
+    - position:
+        x: 0
+        y: 0
+        width: 1280
+        height: 1400
+
+    - position:
+        x: 1280
+        y: 0
+        width: 1280
+        height: 1400

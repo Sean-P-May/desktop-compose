@@ -1,0 +1,10 @@
+path: "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
+default_args:
+  - --new-window
+default_position:
+  x: 0
+  y: 0
+  width: 1920
+  height: 400
+state: maximized
+

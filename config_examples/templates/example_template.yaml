@@ -1,0 +1,11 @@
+name: Gmail and Calendar
+description: check your email and calendar
+zone_file: 1x3.yaml
+apps:
+  - app: chrome
+    zone: 0:0
+  - app: word
+    zone: 0:1
+  - app: word
+    zone: 0:2
+

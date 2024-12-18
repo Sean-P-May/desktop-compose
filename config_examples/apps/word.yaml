@@ -1,0 +1,8 @@
+path: "C:\\Program Files\\Microsoft Office\\root\\Office16\\WINWORD.EXE"
+default_args:
+  - /q
+default_position:
+  x: 0
+  y: 0
+  width: 1920
+  height: 1080

@@ -1,0 +1,25 @@
+- monitor 1:
+  zones:
+    - position:
+        x: 0
+        y: 0
+        width: 853
+        height: 1440
+  
+    - position:
+        x: 853
+        y: 0
+        width: 853
+        height: 1440
+  
+    - position:
+        x: 1706
+        y: 0
+        width: 853
+        height: 1440
+  
+    - position:
+        x: 0
+        y: 0
+        width: 0
+        height: 0
