@@ -1,6 +1,6 @@
 # Desktop-Compose README
 
-## <span style="color:red">*Alpha build, not suitable for production use*.</span>
+<span style="color:red">*Alpha build, not suitable for production use*.</span>
 
 ## Overview
 
