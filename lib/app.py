@@ -1,3 +1,5 @@
+import os
+import time
 from dataclasses import dataclass, field
 from typing import Optional, List
 
@@ -5,7 +7,9 @@ import subprocess
 
 import pyvda
 import win32gui
+import yaml
 
+from lib.config import Config
 from lib.position import Position
 
 
@@ -50,6 +54,7 @@ class LocalAppConfig:
         """
         Post-initialization processing to parse the zone configuration.
         """
+        print(self.zone)
         monitor, zone = self.zone.split(":")
         monitor = int(monitor)
         self.zone = (monitor, zone)
@@ -95,6 +100,10 @@ class App:
 
         self.window_handle = _get_window_handle()
         self.move_window()
+
+        time.sleep(.3)
+
+
 
     def move_window(self, force: bool = False):
         """
@@ -186,7 +195,7 @@ class App:
         return self.local_config.kill_before_start_command or self.app_config.kill_before_start_command
 
 
-def _get_window_handle(previous_window_handles=[], retries=150):
+def _get_window_handle(previous_window_handles=[], retries=100):
     """
     Get the window handle of the application.
 
@@ -216,3 +225,15 @@ def _get_window_handle(previous_window_handles=[], retries=150):
     #Recursion is necessary to prevent the wrong window handel being assigned
     # Retry with reduced attempts
     return _get_window_handle(previous_window_handles, retries - 1)
+
+
+def list_all_apps() -> None:
+    config = Config()
+    for app_file in os.listdir(config.apps_directory):
+        with open(os.path.join(config.apps_directory, app_file)) as file:
+            yaml_text = file.read()
+            app_name = app_file.split(".")[0]
+            app_config = AppConfig(**yaml.safe_load(yaml_text))
+            print(f"{'-' * 60}\n{app_name}\npath:   {app_config.path}\ndefault_args:   {app_config.default_args}")
+
+
