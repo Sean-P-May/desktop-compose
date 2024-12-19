@@ -1,5 +1,7 @@
 import os.path
 from typing import List, Optional
+
+import pyvda
 import yaml
 import logging
 
@@ -12,29 +14,7 @@ from lib.zone_layout import ZoneLayout, Monitor
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-
-def load_monitor_layouts(zone_file: str, config: Config) -> List[Monitor]:
-    """
-    Load and process monitor layouts from a YAML zone configuration file.
-    Returns a list of Monitor objects with their respective zone layouts.
-    """
-    monitors = []
-    # Open the YAML file containing zone configurations
-    with open(os.path.join(config.zone_configs_directory, zone_file)) as f:
-        monitor_layout_yaml = yaml.safe_load(f)
-        for monitor_yaml in monitor_layout_yaml:
-            monitor = Monitor()
-            # Process each zone layout within the monitor
-            print(
-                monitor_yaml["zones"]
-            )
-            for zone_layout in monitor_yaml["zones"]:
-                logger.info(f"Processing zone layout: {zone_layout}")
-                # Add the zone position to the monitor's zone layouts
-                monitor.zone_layouts.append(Position(**zone_layout["position"]))
-            monitors.append(monitor)
-    logger.info(f"Loaded monitors: {monitors}")
-    return monitors
+config = Config()
 
 
 class Templates:
@@ -72,6 +52,12 @@ class Templates:
         # Parse the zone configuration if a zone file is provided
         self.parse_zone_configs(zone_file)
 
+    def launch(self):
+        pyvda.VirtualDesktop.create().go()
+        for app in self.apps:
+            app.open()
+
+
     def parse_zone_configs(self, zone_file: Optional[str]):
         """
         Parse the zone configurations from the provided file and
@@ -93,6 +79,8 @@ class Templates:
             # Retrieve the monitor and zone indices from the app's configuration
             monitor, zone = app.local_config.zone
             monitor, zone = int(monitor), int(zone)
+            print(monitors)
+            print(monitor, zone)
             app.local_config.position = monitors[monitor].zone_layouts[zone]
             logger.info(f"App position set: {app}")
 
@@ -101,6 +89,7 @@ class Templates:
         Load applications based on their YAML configurations.
         Returns a list of App objects.
         """
+
         config = Config()  # Load global configuration settings
         loaded_apps = []
         for app_data in apps_yaml:
@@ -118,3 +107,47 @@ class Templates:
                     loaded_apps.append(app)
                     logger.info(f"App loaded: {app}")
         return loaded_apps
+
+def load_monitor_layouts(zone_file: str, config: Config) -> List[Monitor]:
+    """
+    Load and process monitor layouts from a YAML zone configuration file.
+    Returns a list of Monitor objects with their respective zone layouts.
+    """
+    monitors = []
+    # Open the YAML file containing zone configurations
+    with open(os.path.join(config.zone_configs_directory, zone_file)) as f:
+        monitor_layout_yaml = yaml.safe_load(f)
+        for monitor_yaml in monitor_layout_yaml:
+            monitor = Monitor()
+            # Process each zone layout within the monitor
+            print(
+                monitor_yaml["zones"]
+            )
+            for zone_layout in monitor_yaml["zones"]:
+                logger.info(f"Processing zone layout: {zone_layout}")
+                # Add the zone position to the monitor's zone layouts
+                monitor.zone_layouts.append(Position(**zone_layout["position"]))
+            monitors.append(monitor)
+    logger.info(f"Loaded monitors: {monitors}")
+    return monitors
+
+
+def load_template(template_name: str):
+    if os.path.exists(f"{config.templates_directory}/{template_name}.yaml"):
+        with open(f"{config.templates_directory}/{template_name}.yaml") as f:
+            return Templates(**yaml.safe_load(f))
+    else:
+        print(f"Template not found: {template_name}")
+        exit(1)
+
+def list_templates():
+    if os.path.exists(config.templates_directory):
+        print(os.listdir(config.templates_directory))
+        for template_yaml_file in os.listdir(config.templates_directory):
+            yaml_name = template_yaml_file.split(".")[0]
+            template = load_template(yaml_name)
+            print(template.name)
+            print("--------------------------------------------------")
+            print(yaml_name+".yaml")
+            print(template.description)
+

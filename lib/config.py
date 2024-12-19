@@ -10,6 +10,7 @@ class Config:
     apps_directory: str = field(default=os.path.expanduser("~/.config/desktop_compose/apps"))
     templates_directory: str = field(default=os.path.expanduser("~/.config/desktop_compose/templates"))
     zone_configs_directory: str = field(default=os.path.expanduser("~/.config/desktop_compose/zone_configs"))
+    default_text_editor: str = field(default="code")
 
 
 
@@ -57,17 +58,19 @@ class Config:
             yaml.dump({
                 "apps_directory": self.apps_directory,
                 "templates_directory": self.templates_directory,
-                "zone_configs_directory": self.zone_configs_directory
+                "zone_configs_directory": self.zone_configs_directory,
+                "default_text_editor": self.default_text_editor,
             }, f)
 
 
 
     def load_config(self):
         with open(self._config_file, "r") as f:
-            paths = yaml.safe_load(f)
-            self.apps_directory = paths["apps_directory"]
-            self.templates_directory = paths["templates_directory"]
-            self.zone_configs_directory = paths["zone_configs_directory"]
+            config_file = yaml.safe_load(f)
+            self.apps_directory = config_file["apps_directory"]
+            self.templates_directory = config_file["templates_directory"]
+            self.zone_configs_directory = config_file["zone_configs_directory"]
+            self.default_text_editor = config_file["default_text_editor"]
 
     def get_error_line_number(self, error):
         if hasattr(error, 'problem_mark'):
