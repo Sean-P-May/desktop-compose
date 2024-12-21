@@ -1,7 +1,7 @@
 import os
 import subprocess
 from shutil import copyfile
-from lib.config import Config
+from lib.config import Config, ConfigKeys
 from lib.phase_args import Commands, ParsedArguments
 
 config = Config()
