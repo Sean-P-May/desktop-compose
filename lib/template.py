@@ -1,4 +1,5 @@
 import os.path
+import subprocess
 from typing import List, Optional
 
 import pyvda
@@ -40,25 +41,67 @@ class Templates:
     name: str
     description: str
     apps: List[App]
+    scripts: List[str]
     def __init__(self,
                  name: str,
                  description: str,
                  apps: Optional[List[dict]] = None,
-                 zone_file: Optional[str] = None):
+                 scripts: Optional[List[str]] = None,
+                 layout_file: Optional[str] = None):
         # Initialize basic attributes
         self.name = name
         self.description = description
         # Load apps using the helper function; pass an empty list if apps is None
         self.apps: List[App] = load_apps(apps or [])
         # Parse the zone configuration if a zone file is provided
-        self.parse_zone_configs(zone_file)
+        self.parse_layout_configs(layout_file)
+        self.scripts = scripts
 
     def launch(self):
         pyvda.VirtualDesktop.create().go()
         for app in self.apps:
             app.open()
 
-    def parse_zone_configs(self, zone_file: Optional[str]):
+        if self.scripts:
+            self.run_scripts()
+
+    def run_scripts(self):
+        def run_scripts(self):
+            commands = {
+                ".py": ["python"],
+                ".ps1": ["powershell", "-File"],
+                ".sh": ["bash"],
+                ".js": ["node"]
+            }
+
+            for script in self.scripts:
+                script_path = os.path.join(self.scripts_directory, script)
+
+                if os.path.isdir(script_path):
+                    for file in os.listdir(script_path):
+                        full_path = os.path.join(script_path, file)
+                        file_extension = os.path.splitext(file)[1]
+                        if file_extension in commands:
+                            subprocess.run(commands[file_extension] + [full_path])
+                else:
+                    if not os.path.splitext(script)[1]:
+                        for ext, cmd in commands.items():
+                            candidate_path = script_path + ext
+                            if os.path.isfile(candidate_path):
+                                subprocess.run(cmd + [candidate_path])
+                                break
+                    else:
+                        file_extension = os.path.splitext(script)[1]
+                        print(file_extension)
+                        if file_extension in commands and os.path.isfile(script_path):
+                            subprocess.run(commands[file_extension] + [script_path])
+
+
+
+
+
+
+    def parse_layout_configs(self, zone_file: Optional[str]):
         """
         Parse the zone configurations from the provided file and
         assign positions to apps based on the monitor and zone layout.

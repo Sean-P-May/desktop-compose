@@ -1,6 +1,6 @@
 name: Gmail and Calendar
 description: check your email and calendar
-zone_file: 1x3.yaml
+layout_file: 1x3.yaml
 apps:
   - app: chrome
     zone: 0:0
