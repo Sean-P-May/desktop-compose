@@ -18,6 +18,74 @@ logger = logging.getLogger(__name__)
 config = Config()
 
 
+import os
+import subprocess
+
+def run_scripts(input_string):
+    """
+    Executes scripts or commands based on the input string.
+
+    The input string can specify a file, directory, or shell command, optionally with arguments.
+    - If a file is provided, it executes the file using the appropriate interpreter based on its extension.
+    - If a directory is provided, it processes only the file matching the input name, if it exists.
+    - If no valid file or directory is found, the input is treated as a shell command.
+    - Additional arguments in the input string are passed to the executed script.
+
+    Args:
+        input_string (str): A string specifying the file, directory, or command, optionally with arguments.
+    """
+    commands = {
+        ".py": ["python"],
+        ".ps1": ["powershell", "-File"],
+        ".sh": ["bash"],
+        ".js": ["node"]
+    }
+
+    # Split input into potential script and arguments
+    parts = input_string.split()
+    if not parts:
+        print("No input provided.")
+        return
+
+    script_candidate = parts[0]  # First word might be the script or directory
+    arguments = parts[1:]  # Everything else are potential arguments
+
+    # Full path of the script or directory
+    script_path = os.path.join(config.scripts_directory, script_candidate)
+
+    if os.path.isdir(script_path):  # If it's a directory
+        found_script = False
+        for file in os.listdir(script_path):
+            full_path = os.path.join(script_path, file)
+            file_name, file_extension = os.path.splitext(file)
+
+            # Match exact name and supported extension
+            if file_name == script_candidate and file_extension in commands:
+                subprocess.run(commands[file_extension] + [full_path] + arguments)
+                found_script = True
+                break  # Stop after finding the matching script
+
+        if not found_script:
+            print(f"No matching script found for '{script_candidate}' in directory '{script_path}'.")
+    elif os.path.isfile(script_path):  # If it's a file
+        file_extension = os.path.splitext(script_candidate)[1]
+        if file_extension in commands:  # File has a recognized extension
+            subprocess.run(commands[file_extension] + [script_path] + arguments)
+        elif not file_extension:  # File has no extension
+            for ext, cmd in commands.items():
+                candidate_path = script_path + ext
+                if os.path.isfile(candidate_path):
+                    subprocess.run(cmd + [candidate_path] + arguments)
+                    break
+        else:
+            print(f"Unsupported file extension: {file_extension}")
+    else:
+        # If it's not a file or directory, attempt to run as a command
+        process_result = subprocess.run(input_string, shell=True)
+        if process_result.returncode != 0:
+            print("Invalid script file, directory, or command. Check your input.")
+            print(process_result.stdout)
+
 
 
 class Templates:
@@ -46,7 +114,8 @@ class Templates:
                  name: str,
                  description: str,
                  apps: Optional[List[dict]] = None,
-                 scripts: Optional[List[str]] = None,
+                 after_scripts: Optional[List[str]] = None,
+                 before_scripts: Optional[List[str]] = None,
                  layout_file: Optional[str] = None):
         # Initialize basic attributes
         self.name = name
@@ -55,51 +124,23 @@ class Templates:
         self.apps: List[App] = load_apps(apps or [])
         # Parse the zone configuration if a zone file is provided
         self.parse_layout_configs(layout_file)
-        self.scripts = scripts
+        self.before_scripts = before_scripts
+        self.after_scripts = after_scripts
 
     def launch(self):
-        pyvda.VirtualDesktop.create().go()
-        for app in self.apps:
-            app.open()
+        # pyvda.VirtualDesktop.create().go()
+        if self.before_scripts:
 
-        if self.scripts:
-            self.run_scripts()
+            for script in self.before_scripts:
+                run_scripts(script)
 
-    def run_scripts(self):
-        def run_scripts(self):
-            commands = {
-                ".py": ["python"],
-                ".ps1": ["powershell", "-File"],
-                ".sh": ["bash"],
-                ".js": ["node"]
-            }
+        # for app in self.apps:
+        #     app.open()
 
-            for script in self.scripts:
-                script_path = os.path.join(self.scripts_directory, script)
-
-                if os.path.isdir(script_path):
-                    for file in os.listdir(script_path):
-                        full_path = os.path.join(script_path, file)
-                        file_extension = os.path.splitext(file)[1]
-                        if file_extension in commands:
-                            subprocess.run(commands[file_extension] + [full_path])
-                else:
-                    if not os.path.splitext(script)[1]:
-                        for ext, cmd in commands.items():
-                            candidate_path = script_path + ext
-                            if os.path.isfile(candidate_path):
-                                subprocess.run(cmd + [candidate_path])
-                                break
-                    else:
-                        file_extension = os.path.splitext(script)[1]
-                        print(file_extension)
-                        if file_extension in commands and os.path.isfile(script_path):
-                            subprocess.run(commands[file_extension] + [script_path])
-
-
-
-
-
+        if self.after_scripts:
+            for script in self.after_scripts:
+                print(script)
+                run_scripts(script)
 
     def parse_layout_configs(self, zone_file: Optional[str]):
         """
@@ -126,6 +167,8 @@ class Templates:
             print(monitor, zone)
             app.local_config.position = monitors[monitor].app_positions[zone]
             logger.info(f"App position set: {app}")
+
+
 def load_monitor_layouts(zone_file: str, config: Config) -> List[Monitor]:
     """
     Load and process monitor layouts from a YAML zone configuration file.
