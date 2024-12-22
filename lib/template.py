@@ -128,14 +128,14 @@ class Templates:
         self.after_scripts = after_scripts
 
     def launch(self):
-        # pyvda.VirtualDesktop.create().go()
+        pyvda.VirtualDesktop.create().go()
         if self.before_scripts:
 
             for script in self.before_scripts:
                 run_scripts(script)
 
-        # for app in self.apps:
-        #     app.open()
+        for app in self.apps:
+            app.open()
 
         if self.after_scripts:
             for script in self.after_scripts:
