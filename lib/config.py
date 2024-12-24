@@ -8,6 +8,7 @@ class ConfigKeys(Enum):
     ZONE_CONFIGS_DIRECTORY = "zone_configs_directory"
     SCRIPTS_DIRECTORY = "scripts_directory"
     DEFAULT_TEXT_EDITOR = "default_text_editor"
+    GLOBAL_CONFIGS_DIRECTORY = "global_configs_directory"
 
 
 class Config:
@@ -21,6 +22,7 @@ class Config:
         self.templates_directory = os.path.expanduser("~/.config/desktop_compose/templates")
         self.zone_configs_directory = os.path.expanduser("~/.config/desktop_compose/zone_configs")
         self.scripts_directory = os.path.expanduser("~/.config/desktop_compose/scripts")
+        self.global_variables_file = os.path.expanduser("~/.config/desktop_compose/variables.yaml")
         self.default_text_editor = "code"
 
         self.initialize_config()
@@ -46,7 +48,8 @@ class Config:
             ConfigKeys.TEMPLATES_DIRECTORY.value: self.templates_directory,
             ConfigKeys.ZONE_CONFIGS_DIRECTORY.value: self.zone_configs_directory,
             ConfigKeys.SCRIPTS_DIRECTORY.value: self.scripts_directory,
-            ConfigKeys.DEFAULT_TEXT_EDITOR.value: self.default_text_editor
+            ConfigKeys.DEFAULT_TEXT_EDITOR.value: self.default_text_editor,
+            ConfigKeys.GLOBAL_CONFIGS_DIRECTORY.value: self.global_variables_file,
         }
         self.write_yaml(self.config_file, config_data)
 
@@ -62,10 +65,10 @@ class Config:
             self.templates_directory = config_data[ConfigKeys.TEMPLATES_DIRECTORY.value]
         if ConfigKeys.ZONE_CONFIGS_DIRECTORY.value in config_data:
             self.zone_configs_directory = config_data[ConfigKeys.ZONE_CONFIGS_DIRECTORY.value]
-        if ConfigKeys.SCRIPTS_DIRECTORY.value in config_data:
-            self.scripts_directory = config_data[ConfigKeys.SCRIPTS_DIRECTORY.value]
         if ConfigKeys.DEFAULT_TEXT_EDITOR.value in config_data:
             self.default_text_editor = config_data[ConfigKeys.DEFAULT_TEXT_EDITOR.value]
+        if ConfigKeys.GLOBAL_CONFIGS_DIRECTORY.value in config_data:
+            self.global_variables_file = config_data[ConfigKeys.GLOBAL_CONFIGS_DIRECTORY.value]
 
     def handle_yaml_error(self, error):
         """Handle YAML errors by printing line number and exiting."""
@@ -83,7 +86,7 @@ class Config:
             self.apps_directory,
             self.templates_directory,
             self.zone_configs_directory,
-            self.scripts_directory
+            self.scripts_directory,
         ]
         for path in directories:
             os.makedirs(path, exist_ok=True)
@@ -92,4 +95,5 @@ class Config:
     def write_yaml(filename, data):
         """Write data to a YAML file."""
         with open(filename, "w") as f:
-            yaml.dump(data, f)
+            yaml.dump(data, f
+                      )
