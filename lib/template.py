@@ -1,5 +1,6 @@
 import os.path
 import subprocess
+import re
 from typing import List, Optional
 
 import pyvda
@@ -196,8 +197,10 @@ def load_monitor_layouts(zone_file: str, config: Config) -> List[Monitor]:
 
 def load_template(template_name: str):
     if os.path.exists(f"{config.templates_directory}/{template_name}.yaml"):
-        with open(f"{config.templates_directory}/{template_name}.yaml") as f:
-            return Templates(**yaml.safe_load(f))
+        with open(f"{config.templates_directory}/{template_name}.yaml") as file:
+            yaml_string = file.read()
+            template_dict = yaml.safe_load(yaml_string)
+            return Templates(template_name, template_dict)
     else:
         print(f"Template not found: {template_name}")
         exit(1)
@@ -238,3 +241,109 @@ def load_apps(apps_yaml: List[dict]) -> List[App]:
                 loaded_apps.append(app)
                 logger.info(f"App loaded: {app}")
     return loaded_apps
+
+
+def parse_variables(raw_yaml: str, yaml_dict: dict, global_variables_file: str) -> str:
+    """
+    Parse and substitute variables in raw_yaml, using:
+      1) Template variables from raw_yaml itself
+      2) Local variables from yaml_dict
+      3) Global variables from global_variables_file
+    Then normalize paths to avoid double slashes.
+    """
+    # -----------------
+    # 1. Load Global Variables
+    # -----------------
+    with open(global_variables_file, "r", encoding="utf-8") as f:
+        global_vars = yaml.safe_load(f) or {}
+
+    # -----------------
+    # 2. Parse the raw_yaml into a Python dict so we can get template-defined variables
+    # -----------------
+    parsed_yaml = yaml.safe_load(raw_yaml) or {}
+    template_vars = parsed_yaml.get("variables", {})
+
+    # -----------------
+    # 3. Merge local variables from yaml_dict into template_vars
+    # -----------------
+    local_vars = yaml_dict.get("variables", {})
+    merged_vars = {**template_vars, **local_vars}  # local overrides template
+
+    # Dictionary for final resolved values
+    resolved_dict = {}
+    # Detect real circular references
+    resolving_stack = set()
+
+    # Regex to match placeholders like <SOMETHING>
+    placeholder_pattern = re.compile(r"<(.*?)>")
+
+    def resolve_value(expression: str) -> str:
+        """Recursively resolve placeholders in an expression string."""
+        placeholders = placeholder_pattern.findall(expression)
+        for ph in placeholders:
+            ph_value = resolve_variable(ph)
+            expression = expression.replace(f"<{ph}>", ph_value)
+        return expression
+
+    def resolve_variable(var_name: str) -> str:
+        """Compute the final value of a single variable."""
+        # Already resolved?
+        if var_name in resolved_dict:
+            return resolved_dict[var_name]
+
+        # Check for real circular reference
+        if var_name in resolving_stack:
+            raise ValueError(f"Circular reference detected for variable '{var_name}'.")
+        resolving_stack.add(var_name)
+
+        # Value from local/template or global?
+        if var_name in merged_vars:
+            base_value = merged_vars[var_name]
+        elif var_name in global_vars:
+            base_value = global_vars[var_name]
+        else:
+            base_value = input(f"Enter value for {var_name}: ")
+
+        # Recursively substitute any placeholders in base_value
+        final_value = resolve_value(str(base_value))
+
+        # Mark as resolved
+        resolving_stack.remove(var_name)
+        resolved_dict[var_name] = final_value
+        return final_value
+
+    # -----------------
+    # 4. Resolve each variable in merged_vars
+    # -----------------
+    for key in merged_vars.keys():
+        resolve_variable(key)
+
+    # -----------------
+    # 5. Substitute placeholders in raw_yaml
+    # -----------------
+    def substitute_placeholder(match):
+        ph = match.group(1)
+        return resolved_dict.get(ph, match.group(0))  # fallback: leave <ph> if unknown
+
+    resolved_yaml = placeholder_pattern.sub(substitute_placeholder, raw_yaml)
+
+    # -----------------
+    # 6. Normalize double slashes in each resolved variable and in final YAML
+    # -----------------
+    def remove_double_slashes(path: str) -> str:
+        """
+        Replace multiple forward slashes '//' with a single slash '/',
+        except if it appears after a colon (e.g. 'http://' should stay).
+        This helps fix local file paths that might end up with //.
+        """
+        return re.sub(r'(?<!:)//+', '/', path)
+
+    # Normalize each resolved dictionary entry
+    for k, v in resolved_dict.items():
+        resolved_dict[k] = remove_double_slashes(v)
+
+    # Also normalize the final resolved YAML
+    resolved_yaml = remove_double_slashes(resolved_yaml)
+
+    return resolved_yaml
+
