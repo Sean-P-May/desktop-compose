@@ -6,12 +6,13 @@ from typing import Optional, List
 import subprocess
 
 import pyvda
+import win32con
 import win32gui
 import yaml
 
 from lib.config import Config
 from lib.position import Position
-
+from lib.layout import Location
 
 @dataclass
 class AppConfig:
@@ -32,7 +33,6 @@ class AppConfig:
     state: Optional[bool] = False
 
 
-@dataclass
 class LocalAppConfig:
     """
     Local configuration overrides for an app.
@@ -46,18 +46,30 @@ class LocalAppConfig:
     """
     app: str
     args: List[str] = field(default_factory=list)
-    zone: Optional[str] = field(default_factory=lambda: "0:0")
+    monitor: int = 0
+    location: Optional[Location] = None
     minimize: Optional[bool] = False
-    position: Optional[Position] = None
 
-    def __post_init__(self):
-        """
-        Post-initialization processing to parse the zone configuration.
-        """
-        print(self.zone)
-        monitor, zone = self.zone.split(":")
-        monitor = int(monitor)
-        self.zone = (monitor, zone)
+
+    def __init__(self, app: str,
+                 monitor: int,
+                 args: Optional[List[str]] = [],
+                 location: Optional[dict] = None,
+                 minimize: Optional[bool] = False):
+
+        self.app = app
+        self.args = args
+        self.monitor = monitor - 1
+        print("wedfqea", location)
+        self.location = Location(**location) if location else None
+        self.minimize = minimize
+
+
+
+
+
+
+
 
 
 class App:
@@ -86,11 +98,11 @@ class App:
         """
         self.app_config = app_config
         self.local_config = local_config
-        self.zone_config_file = zone_config_file
         self.window_handle = None
         self.process = None
+        self.position = None
 
-    def open(self):
+    def launch(self):
         """
         Launch the app and store its window handle.
         """
@@ -99,19 +111,15 @@ class App:
                                         creationflags=subprocess.DETACHED_PROCESS)
 
         self.window_handle = _get_window_handle()
-        self.move_window()
 
+        self.move_window()
         time.sleep(.3)
 
+    def move_window(self, retries: int = 0):
+        if not self.window_handle:
+            print("Invalid window handle. Skipping move.")
+            return
 
-
-    def move_window(self, force: bool = False):
-        """
-        Move the application window to the specified position.
-
-        Args:
-            force (bool): Whether to force the window move.
-        """
         position = self.resolve_position()
         window_handle = self.window_handle
 
@@ -119,12 +127,18 @@ class App:
             x=-7,
             y=-3,
             width=14,
-            height=7
         )
-        print(position + offset)
-        x, y, width, height = position + offset
 
-        win32gui.MoveWindow(window_handle, x, y, width, height, True)
+        position = position + offset
+        x, y, width, height = position
+
+        try:
+            win32gui.ShowWindow(window_handle, win32con.SW_RESTORE)
+            win32gui.MoveWindow(window_handle, x, y, width, height, True)
+            if self.get_window_position() != position and retries < 5:
+                self.move_window(retries + 1)
+        except Exception as e:
+            print(f"Failed to move window: {e}")
 
     def get_window_position(self) -> Position:
         """
@@ -174,7 +188,7 @@ class App:
         Returns:
             Position: The position of the application window.
         """
-        return self.local_config.position or self.app_config.default_position
+        return self.position or self.app_config.default_position
 
     def resolve_minimize(self):
         """
@@ -185,14 +199,7 @@ class App:
         """
         return self.local_config.minimize if self.local_config.minimize is not None else False
 
-    def resolve_kill_command(self):
-        """
-        Resolve the command to kill the application before starting it.
 
-        Returns:
-            str: The command to kill the application before starting it.
-        """
-        return self.local_config.kill_before_start_command or self.app_config.kill_before_start_command
 
 
 def _get_window_handle(previous_window_handles=[], retries=100):

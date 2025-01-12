@@ -1,7 +1,6 @@
 from dataclasses import dataclass, field
 from typing import Optional, List
 
-
 @dataclass
 class Position:
     ''' Represents the position and size of a window '''

@@ -95,5 +95,4 @@ class Config:
     def write_yaml(filename, data):
         """Write data to a YAML file."""
         with open(filename, "w") as f:
-            yaml.dump(data, f
-                      )
+            yaml.dump(data, f, default_flow_style=False, sort_keys=False)
