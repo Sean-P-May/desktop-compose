@@ -164,6 +164,7 @@ def list_templates():
     templates_yaml_list = []
 
     for template in templates:
-        templates_yaml_list.append(template.__dict__())
+        dictionary = template.__dict__()
+        templates_yaml_list.append(template.serialize_for_list())
 
     print(yaml.dump(templates_yaml_list, default_flow_style=False, sort_keys=False))

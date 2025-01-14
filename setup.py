@@ -12,7 +12,7 @@ setup(
     packages=find_packages(),  # Find other packages (if applicable)
     entry_points={
         'console_scripts': [
-            'desktop-compose=bin.desktop_compose:main',  # Entry point references main() in bin/desktop_compose.py
+            'desktop-compose=bin.desktop_compose:app',  # Entry point references main() in bin/desktop_compose.py
         ],
     },
     include_package_data=True,

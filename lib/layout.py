@@ -28,6 +28,22 @@ class Location:
     row_span: Optional[int] = None
     col_span: Optional[int] = None
 
+    def __dict__(self):
+        if self.row_span is None and self.col_span is None:
+            return {
+                "row": self.row,
+                "col": self.col,
+            }
+        else:
+            return {
+                "row": self.row,
+                "col": self.col,
+                "row_span": self.row_span,
+                "col_span": self.col_span,
+            }
+
+
+
 
 @dataclass
 class Layout:

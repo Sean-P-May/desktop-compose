@@ -1,5 +1,6 @@
 import os
 import subprocess
+import time
 from typing import List, Optional
 import pyvda
 import yaml
@@ -42,6 +43,7 @@ class Template:
         self.apps: List[App] = load_apps(apps or [])
 
         # Default to an empty list if layout is None
+
         self.layouts = [Layout(**layout) for layout in (layout or [])]
 
         self.before_scripts = before_scripts
@@ -52,14 +54,13 @@ class Template:
     def parse_layout(self):
         monitors = []
         for monitor_number, layout in enumerate(self.layouts):
-            print(layout)
-            monitors.append(Monitor(monitor_number - 1, layout))
+            monitors.append(Monitor(monitor_number, layout))
 
-        print(monitors)
+
 
         for app in self.apps:
-            print("whore", app.local_config.monitor - 1)
-            app.position = monitors[app.local_config.monitor - 1].resolve_position(app.local_config.location)
+
+            app.position = monitors[app.local_config.monitor].resolve_position(app.local_config.location)
 
 
 
@@ -73,19 +74,23 @@ class Template:
 
         for app in self.apps:
             app.launch()
+            time.sleep(.2)
 
         if self.after_scripts:
             for script in self.after_scripts:
                 resolve_and_execute(script)
 
     def edit(self):
-        subprocess.run([config.default_text_editor, self.parent_directory])
+        subprocess.run([config.default_text_editor, os.path.join(self.parent_directory, self.file_name)], shell=True)
 
     def save(self):
         with open(os.path.join(self.parent_directory, self.file_name), "w") as f:
+            dictionary = self.__dict__()
+            dictionary.pop("file")
+
             f.write(
                 yaml.dump(
-                    self.__dict__(),
+                    dictionary,
                     default_flow_style=False,
                     sort_keys=False, )
             )
@@ -97,10 +102,22 @@ class Template:
         return {
             "name": self.name,
             "description": self.description,
-            "layout": [layout.__dict__ for layout in self.layouts],  # Convert Layout objects to dict
+            "layout": [layout.__dict__ for layout in self.layouts],
             "before_scripts": self.before_scripts,
             "after_scripts": self.after_scripts,
-            "apps": [app.local_config.__dict__ for app in self.apps],
+            "file": self.file_name,
+            "apps": [app.__dict__() for app in self.apps],
+
+
+
+        }
+
+    def serialize_for_list(self):
+        """Convert the template to a dictionary for serialization."""
+        return {
+            "name": self.name,
+            "description": self.description,
+            "file": self.file_name,
         }
 
 
@@ -115,7 +132,7 @@ def load_apps(apps_yaml: List[dict]) -> List[App]:
     loaded_apps = []
     for app_data in apps_yaml:
         logger.info(f"Loading app data: {app_data}")
-        print(app_data)
+
         # Create a local configuration for the app
         local_app_config = LocalAppConfig(**app_data)
         # Determine the path to the app's main configuration file
