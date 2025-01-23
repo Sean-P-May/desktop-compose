@@ -2,17 +2,20 @@ import os
 import time
 from dataclasses import dataclass, field
 from typing import Optional, List
-
+from ctypes import cast, c_wchar_p
 import subprocess
 
 import pyvda
 import win32con
 import win32gui
 import yaml
+from pyvda import VirtualDesktop
 
 from lib.config import Config
 from lib.position import Position
 from lib.layout import Location
+
+
 
 @dataclass
 class AppConfig:
@@ -29,8 +32,9 @@ class AppConfig:
     path: str
     default_position: Optional[Position] = field(default_factory=lambda: Position())
     default_args: List[str] = field(default_factory=list)
-    kill_before_start_command: Optional[str] = ''
+    move_if_opened: Optional[bool] = False
     state: Optional[bool] = False
+    delay: Optional[float] = 0.0
 
 
 class LocalAppConfig:
@@ -51,6 +55,8 @@ class LocalAppConfig:
     minimize: Optional[bool] = False
 
 
+
+
     def __init__(self, app: str,
                  monitor: int,
                  args: Optional[List[str]] = [],
@@ -60,9 +66,18 @@ class LocalAppConfig:
         self.app = app
         self.args = args
         self.monitor = monitor - 1
-        print("wedfqea", location)
         self.location = Location(**location) if location else None
         self.minimize = minimize
+
+    def __dict__(self):
+        return {
+            "app": self.app,
+            "args": self.args,
+            "monitor": self.monitor + 1,
+            "location": (self.location.__dict__() if self.location else None),
+            "minimize": self.minimize,
+        }
+
 
 
 
@@ -106,16 +121,37 @@ class App:
         """
         Launch the app and store its window handle.
         """
-        print(f"Launching App: {self.resolve_path()}")
-        self.process = subprocess.Popen([self.resolve_path()] + self.resolve_args(), shell=True,
-                                        creationflags=subprocess.DETACHED_PROCESS)
+        handles_already_added = []
+        print(f"Launching App: {self.local_config.app}")
+        if self.app_config.move_if_opened:
+            print("checking if the app is opened")
+            desktops = pyvda.get_virtual_desktops()
+            for desktop in desktops:
+                for app in  desktop.apps_by_z_order():
+                    try:
+                        app_id = cast(app.app_id, c_wchar_p).value  # Safely dereference
+                    except AttributeError:
+                        app_id = None
+                    if isinstance(app_id, str):
+                        if self.local_config.app.lower() in app_id.lower():
+                            self.window_handle = app.hwnd
+                            handles_already_added.append(self.window_handle)
+                            app.move(VirtualDesktop.current())
 
-        self.window_handle = _get_window_handle()
+
+
+
+
+        else:
+            self.process = subprocess.Popen([self.resolve_path()] + self.resolve_args(), shell=True,
+                                            creationflags=subprocess.DETACHED_PROCESS)
+            time.sleep(self.app_config.delay)
+            self.window_handle = _get_window_handle()
 
         self.move_window()
-        time.sleep(.3)
 
     def move_window(self, retries: int = 0):
+        print(self.window_handle)
         if not self.window_handle:
             print("Invalid window handle. Skipping move.")
             return
@@ -199,10 +235,14 @@ class App:
         """
         return self.local_config.minimize if self.local_config.minimize is not None else False
 
+    def __dict__(self):
+        return self.local_config.__dict__()
 
 
 
-def _get_window_handle(previous_window_handles=[], retries=100):
+
+
+def _get_window_handle(previous_window_handles=[], retries=1500):
     """
     Get the window handle of the application.
 
@@ -221,7 +261,9 @@ def _get_window_handle(previous_window_handles=[], retries=100):
         print("try increasing retries")
         raise RuntimeError
 
-    current_window_handles = [app.hwnd for app in pyvda.VirtualDesktop.current().apps_by_z_order()]
+    current_window_handles = (
+            [app.hwnd for app in pyvda.VirtualDesktop.current().apps_by_z_order()]
+            + previous_window_handles)
 
     # Find a window_handle that is not in the previous_window_handles
     for window_handle in current_window_handles:

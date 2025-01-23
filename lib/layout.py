@@ -12,7 +12,6 @@ ctypes.windll.shcore.SetProcessDpiAwareness(2)
 monitor_info_list = screeninfo.get_monitors()
 
 
-@dataclass
 class Location:
     """
     Represents a window's location on a grid.
@@ -27,6 +26,13 @@ class Location:
     col: int
     row_span: Optional[int] = None
     col_span: Optional[int] = None
+
+    def __init__(self, row: int, col: int, row_span: Optional[int] = None, col_span: Optional[int] = None):
+        self.row = row
+        self.col = col
+        self.row_span = row_span
+        self.col_span = col_span
+
 
     def __dict__(self):
         if self.row_span is None and self.col_span is None:
@@ -56,6 +62,12 @@ class Layout:
     """
     rows: int
     cols: int
+
+    def __dict__(self):
+        return {
+            "rows": self.rows,
+            "cols": self.cols,
+        }
 
 
 class Monitor:

@@ -102,7 +102,7 @@ class Template:
         return {
             "name": self.name,
             "description": self.description,
-            "layout": [layout.__dict__ for layout in self.layouts],
+            "layout": [layout.__dict__() for layout in self.layouts],
             "before_scripts": self.before_scripts,
             "after_scripts": self.after_scripts,
             "file": self.file_name,
