@@ -2,7 +2,7 @@
 ## This readme needs to be updated as 1/31/2025
 <span style="color:red">*Alpha build, not suitable for production use*.</span>
 
-#I moved to linux with hyprland so I probabaly wont work on this ever again!
+# I moved to linux with hyprland so I probabaly wont work on this ever again!
 
 ## Overview
 
