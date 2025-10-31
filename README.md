@@ -2,6 +2,8 @@
 ## This readme needs to be updated as 1/31/2025
 <span style="color:red">*Alpha build, not suitable for production use*.</span>
 
+#I moved to linux with hyprland so I probabaly wont work on this ever again!
+
 ## Overview
 
 Desktop-Compose is a powerful tool for managing virtual desktops and automating desktop application layouts and workflows. It uses YAML configurations to define how applications are arranged, launched, and managed across monitors and virtual desktops. Designed for power users, developers, and professionals, Desktop-Compose aims to optimize productivity by providing consistent and customizable desktop setups.
